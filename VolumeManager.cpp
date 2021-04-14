@@ -276,17 +276,43 @@ int VolumeManager::stop() {
     return 0;
 }
 
+void VolumeManager::enhanceUsbStability(NetlinkEvent *evt) {
+        char path[256];
+        const char *tmp = evt->findParam("DEVNAME");
+        char devname[4];
+        FILE *fp;
+        int msecs = 1000;
+
+        if (tmp && !strncmp(tmp, "sd", 2)) {
+           strncpy(devname,tmp,3);
+           devname[3] = '\0';
+           sprintf(path, "/sys/block/%s/events_poll_msecs", devname);
+           //usleep(1000 * 1000);
+           if ((fp = fopen(path, "r+ "))) {
+               if (fprintf(fp, "%d\n", msecs) <= 0) {
+                   SLOGE("Failed to write %s (%s)", path, strerror(errno));
+               }
+               SLOGD("Success to write %d to %s ", msecs, path);
+               fclose(fp);
+           } else {
+               SLOGE("Failed to open %s (%s)", path, strerror(errno));
+           }
+       }
+}
+
 void VolumeManager::handleBlockEvent(NetlinkEvent *evt) {
     std::lock_guard<std::mutex> lock(mLock);
 
-    if (mDebug) {
-        LOG(VERBOSE) << "----------------";
-        LOG(VERBOSE) << "handleBlockEvent with action " << (int) evt->getAction();
-        evt->dump();
-    }
-
     std::string eventPath(evt->findParam("DEVPATH")?evt->findParam("DEVPATH"):"");
     std::string devType(evt->findParam("DEVTYPE")?evt->findParam("DEVTYPE"):"");
+
+    if (true) {
+        LOG(VERBOSE) << "----------------";
+        LOG(VERBOSE) << "handleBlockEvent with action " << (int) evt->getAction();
+        LOG(VERBOSE) << "handleBlockEvent with devpath " << eventPath;
+        LOG(VERBOSE) << "handleBlockEvent with devtype " << devType;
+        evt->dump();
+    }
 
     if (devType != "disk") return;
 
@@ -315,6 +341,7 @@ void VolumeManager::handleBlockEvent(NetlinkEvent *evt) {
                         source->getNickname(), flags);
                 disk->create();
                 mDisks.push_back(std::shared_ptr<android::vold::Disk>(disk));
+                enhanceUsbStability(evt);
                 break;
             }
         }

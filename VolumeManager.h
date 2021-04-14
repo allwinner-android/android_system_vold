@@ -93,6 +93,7 @@ public:
     int stop();
 
     void handleBlockEvent(NetlinkEvent *evt);
+    void enhanceUsbStability(NetlinkEvent *evt);
 
     class DiskSource {
     public:

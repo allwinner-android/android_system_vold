@@ -39,9 +39,17 @@
 #include <dirent.h>
 #include <fs_mgr.h>
 
+#include <pthread.h>
+#include <binder/IPCThreadState.h>
+#include <binder/ProcessState.h>
+#include <binder/IServiceManager.h>
+#include "isomount/ISOMountManagerService.h"
+
 static int process_config(VolumeManager *vm);
 static void coldboot(const char *path);
 static void parse_args(int argc, char** argv);
+
+void* startIsoMountService(void*);
 
 struct fstab *fstab;
 
@@ -131,6 +139,12 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
+    pthread_t isoThread;
+    if (pthread_create(&isoThread, NULL,startIsoMountService, NULL)) {
+        SLOGE("startIsoMountService create thread fail (%s)", strerror(errno));
+        exit(1);
+    }
+
     // Eventually we'll become the monitoring thread
     while(1) {
         sleep(1000);
@@ -138,6 +152,15 @@ int main(int argc, char** argv) {
 
     LOG(ERROR) << "Vold exiting";
     exit(0);
+}
+
+void* startIsoMountService(void*)
+{
+    android::sp<android::ProcessState> proc(android::ProcessState::self());
+    android::ISOMountManagerService::instantiate();
+    android::ProcessState::self()->startThreadPool();
+    android::IPCThreadState::self()->joinThreadPool();
+    return NULL;
 }
 
 static void parse_args(int argc, char** argv) {

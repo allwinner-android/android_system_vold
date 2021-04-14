@@ -31,6 +31,8 @@ common_src_files := \
 	KeyStorage.cpp \
 	ScryptParameters.cpp \
 	secontext.cpp \
+	Ntfs.cpp \
+	Exfat.cpp \
 
 common_c_includes := \
 	system/extras/ext4_utils \
@@ -39,7 +41,8 @@ common_c_includes := \
 	frameworks/native/include \
 	system/security/keystore \
 	hardware/libhardware/include/hardware \
-	system/security/softkeymaster/include/keymaster
+	system/security/softkeymaster/include/keymaster \
+	hardware/aw/include
 
 common_shared_libraries := \
 	libsysutils \
@@ -58,6 +61,7 @@ common_shared_libraries := \
 	libsoftkeymaster \
 	libbase \
 	libkeymaster_messages \
+	libisomountmanagerservice
 
 common_static_libraries := \
 	libbootloader_message_writer \

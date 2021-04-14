@@ -15,6 +15,8 @@
  */
 
 #include "fs/Vfat.h"
+#include "Exfat.h"
+#include "Ntfs.h"
 #include "PublicVolume.h"
 #include "Utils.h"
 #include "VolumeManager.h"
@@ -43,7 +45,7 @@ static const char* kAsecPath = "/mnt/secure/asec";
 
 PublicVolume::PublicVolume(dev_t device) :
         VolumeBase(Type::kPublic), mDevice(device), mFusePid(0) {
-    setId(StringPrintf("public:%u,%u", major(device), minor(device)));
+    setId(StringPrintf("public:%u_%u", major(device), minor(device)));
     mDevPath = StringPrintf("/dev/block/vold/%s", getId().c_str());
 }
 
@@ -94,15 +96,22 @@ status_t PublicVolume::doMount() {
     // TODO: expand to support mounting other filesystems
     readMetadata();
 
-    if (mFsType != "vfat") {
+    //if (mFsType != "vfat") {
+        //LOG(ERROR) << getId() << " unsupported filesystem " << mFsType;
+        //return -EIO;
+    //}
+    std::string fs("null");
+    
+    if (!vfat::Check(mDevPath)) {
+        fs="vfat";
+    }else if (!Ntfs::check(mDevPath.c_str())) {
+        fs="ntfs";
+    }else if (!Exfat::check(mDevPath.c_str())){
+        fs="exfat";
+    }else{
         LOG(ERROR) << getId() << " unsupported filesystem " << mFsType;
         return -EIO;
-    }
-
-    if (vfat::Check(mDevPath)) {
-        LOG(ERROR) << getId() << " failed filesystem check";
-        return -EIO;
-    }
+    }    
 
     // Use UUID as stable name, if available
     std::string stableName = getId();
@@ -127,11 +136,24 @@ status_t PublicVolume::doMount() {
         PLOG(ERROR) << getId() << " failed to create mount points";
         return -errno;
     }
-
-    if (vfat::Mount(mDevPath, mRawPath, false, false, false,
-            AID_MEDIA_RW, AID_MEDIA_RW, 0007, true)) {
-        PLOG(ERROR) << getId() << " failed to mount " << mDevPath;
-        return -EIO;
+    if (fs=="vfat"){
+        if (vfat::Mount(mDevPath, mRawPath, false, false, false,
+                AID_MEDIA_RW, AID_MEDIA_RW, 0007, true)) {
+            PLOG(ERROR) << getId() << " failed to mount " << mDevPath;
+            return -EIO;
+        }
+    }else if(fs=="ntfs"){
+        if (Ntfs::doMount(mDevPath.c_str(), mRawPath.c_str(), false, false, false,
+                AID_MEDIA_RW, AID_MEDIA_RW, 0007, true)) {
+            PLOG(ERROR) << getId() << " failed to mount " << mDevPath;
+            return -EIO;
+        }
+    }else if(fs=="exfat"){
+        if (Exfat::doMount(mDevPath.c_str(), mRawPath.c_str(), false, false, false,
+                    AID_MEDIA_RW, AID_MEDIA_RW, 0007, true)) {
+            PLOG(ERROR) << getId() << " failed to mount " << mDevPath;
+            return -EIO;    
+        }
     }
 
     if (getMountFlags() & MountFlags::kPrimary) {
@@ -140,6 +162,7 @@ status_t PublicVolume::doMount() {
 
     if (!(getMountFlags() & MountFlags::kVisible)) {
         // Not visible to apps, so no need to spin up FUSE
+        PLOG(ERROR) << mDevPath << "Direct return,Not visible to apps, so no need to spin up FUSE";
         return OK;
     }
 

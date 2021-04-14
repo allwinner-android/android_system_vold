@@ -153,17 +153,17 @@ status_t KillProcessesUsingPath(const std::string& path) {
     if (Process::killProcessesWithOpenFiles(cpath, SIGINT) == 0) {
         return OK;
     }
-    sleep(5);
+    //sleep(5);
 
     if (Process::killProcessesWithOpenFiles(cpath, SIGTERM) == 0) {
         return OK;
     }
-    sleep(5);
+    //sleep(5);
 
     if (Process::killProcessesWithOpenFiles(cpath, SIGKILL) == 0) {
         return OK;
     }
-    sleep(5);
+    //sleep(5);
 
     // Send SIGKILL a second time to determine if we've
     // actually killed everyone with open files
