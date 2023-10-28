@@ -32,10 +32,11 @@ namespace exfat {
 
 static const char* kMkfsPath = "/system/bin/mkfs.exfat";
 static const char* kFsckPath = "/system/bin/fsck.exfat";
+static const char* kMntPath = "/system/bin/mount.exfat";
 
 bool IsSupported() {
     return access(kMkfsPath, X_OK) == 0 && access(kFsckPath, X_OK) == 0 &&
-           IsFilesystemSupported("exfat");
+           (IsFilesystemSupported("exfat") || access(kMntPath, X_OK) == 0);
 }
 
 status_t Check(const std::string& source) {
@@ -67,8 +68,20 @@ status_t Mount(const std::string& source, const std::string& target, int ownerUi
 
     PLOG(ERROR) << "Mount failed; attempting read-only";
     mountFlags |= MS_RDONLY;
-    if (mount(source.c_str(), target.c_str(), "exfat", mountFlags, mountData.c_str()) == 0) {
-        return 0;
+    if (IsFilesystemSupported("exfat")) {
+        if (mount(source.c_str(), target.c_str(), "exfat", mountFlags, mountData.c_str()) == 0) {
+            return 0;
+        }
+    } else {
+        std::vector<std::string> cmd;
+        cmd.push_back(kMntPath);
+        cmd.push_back("-o");
+        cmd.push_back(mountData);
+        cmd.push_back(source);
+        cmd.push_back(target);
+
+        if (ForkExecvp(cmd) == 0)
+            return 0;
     }
 
     return -1;

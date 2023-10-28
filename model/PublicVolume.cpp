@@ -21,6 +21,7 @@
 #include "VolumeManager.h"
 #include "fs/Exfat.h"
 #include "fs/Vfat.h"
+#include "fs/Ntfs.h"
 
 #include <android-base/logging.h>
 #include <android-base/properties.h>
@@ -110,6 +111,11 @@ status_t PublicVolume::doMount() {
             LOG(ERROR) << getId() << " failed filesystem check";
             return -EIO;
         }
+    } else if (mFsType == "ntfs" && ntfs::IsSupported()) {
+        if (ntfs::Check(mDevPath)) {
+            LOG(ERROR) << getId() << " failed filesystem check";
+            return -EIO;
+        }
     } else {
         LOG(ERROR) << getId() << " unsupported filesystem " << mFsType;
         return -EIO;
@@ -149,6 +155,11 @@ status_t PublicVolume::doMount() {
     } else if (mFsType == "exfat") {
         if (exfat::Mount(mDevPath, mRawPath, AID_ROOT,
                          (isVisible ? AID_MEDIA_RW : AID_EXTERNAL_STORAGE), 0007)) {
+            PLOG(ERROR) << getId() << " failed to mount " << mDevPath;
+            return -EIO;
+        }
+    } else if (mFsType == "ntfs") {
+        if (ntfs::Mount(mDevPath, mRawPath, AID_MEDIA_RW, AID_MEDIA_RW, 0007)) {
             PLOG(ERROR) << getId() << " failed to mount " << mDevPath;
             return -EIO;
         }
@@ -310,6 +321,7 @@ status_t PublicVolume::doUnmount() {
 status_t PublicVolume::doFormat(const std::string& fsType) {
     bool useVfat = vfat::IsSupported();
     bool useExfat = exfat::IsSupported();
+    bool useNtfs = ntfs::IsSupported();
     status_t res = OK;
 
     // Resolve the target filesystem type
@@ -330,11 +342,16 @@ status_t PublicVolume::doFormat(const std::string& fsType) {
         }
     } else if (fsType == "vfat") {
         useExfat = false;
+        useNtfs = false;
     } else if (fsType == "exfat") {
+        useVfat = false;
+        useNtfs = false;
+    } else if (fsType == "ntfs") {
+        useExfat = false;
         useVfat = false;
     }
 
-    if (!useVfat && !useExfat) {
+    if (!useVfat && !useExfat && !useNtfs) {
         LOG(ERROR) << "Unsupported filesystem " << fsType;
         return -EINVAL;
     }
@@ -347,6 +364,8 @@ status_t PublicVolume::doFormat(const std::string& fsType) {
         res = vfat::Format(mDevPath, 0);
     } else if (useExfat) {
         res = exfat::Format(mDevPath);
+    } else if (useNtfs) {
+        res = ntfs::Format(mDevPath);
     }
 
     if (res != OK) {

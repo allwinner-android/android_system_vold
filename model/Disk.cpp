@@ -365,8 +365,6 @@ status_t Disk::readPartitions() {
                 continue;
             }
         } else if (*it == "PART") {
-            foundParts = true;
-
             if (++it == split.end()) continue;
             int i = 0;
             if (!android::base::ParseInt(*it, &i, 1, maxMinors)) {
@@ -389,6 +387,7 @@ status_t Disk::readPartitions() {
                     case 0x0b:  // W95 FAT32 (LBA)
                     case 0x0c:  // W95 FAT32 (LBA)
                     case 0x0e:  // W95 FAT16 (LBA)
+                        foundParts = true;
                         createPublicVolume(partDevice);
                         break;
                 }
@@ -398,6 +397,7 @@ status_t Disk::readPartitions() {
                 if (++it == split.end()) continue;
                 auto partGuid = *it;
 
+                foundParts = true;
                 if (android::base::EqualsIgnoreCase(typeGuid, kGptBasicData)) {
                     createPublicVolume(partDevice);
                 } else if (android::base::EqualsIgnoreCase(typeGuid, kGptAndroidExpand)) {
